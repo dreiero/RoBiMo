@@ -44,9 +44,12 @@ char strGyroY[10];
 char strGyroZ[10];
 
 /*Communication - COM*/
+#define MYADRESS 1
 const byte ENABLE_PIN = 3;          //enable rs485-chip
-const byte LED_PIN = 13;            //defines status LED pin
 SoftwareSerial rs485 (0, 1);        //receive pin, transmit pin
+
+/*Misc*/
+const byte LED_PIN = 13;            //defines status LED pin
 
 //--------------------------------------begin sensor functions-------
 
@@ -213,6 +216,12 @@ void loop()
   
   // send to master 
   digitalWrite (ENABLE_PIN, HIGH);                //enable Communication over RS485 (sending)
+  while(false)
+  {
+    rs485.read();
+  }
+  if (false)
+  {
   rs485.write(strTurb);                           //writes the Datastring to RS485
   rs485.write("NTU ");
   
@@ -244,6 +253,8 @@ void loop()
   rs485.write(strGyroZ);
     
   rs485.write("\r\n");
+  }
+  
   digitalWrite (ENABLE_PIN, LOW);                 //disable RS485 COM
 
 }
