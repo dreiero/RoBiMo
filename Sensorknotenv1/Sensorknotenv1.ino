@@ -14,7 +14,6 @@
 #define THERMISTORNOMINAL 10000     //normal resistance for nominal thermistor temperature
 #define TEMPCALIB -4.5              //calibration factor, gets added as the last step in temperature measurement
 int TempSamples[TEMPNUMSAMPLES];    //array for temperature measurement samples
-char strTemp[10];                   //10 byte char array for storing the temperature measurement
 
 /*Pressure - P*/
 #define PRESSPIN A2                 //analog input pin for pressure measurement
@@ -28,20 +27,10 @@ byte in_char = 0;                   //1 byte buffer to store inbound bytes from 
 /*Turbidity - TURB*/
 #define TURBSENSPIN A1              //analog input pin for turbidity measurement
 #define TURBNUMSAMPLES 10           //number of averaged measurement samples
-char strTurb[10];                   //10 bit char arra< for storung the turbidity measurement
 
 /*Acceleration - A*/
 Adafruit_FXAS21002C gyro = Adafruit_FXAS21002C(0x0021002C);           //declaration for FXAS21992C gyroscope as Adafruit sensor structure (?)
 Adafruit_FXOS8700 accelmag = Adafruit_FXOS8700(0x8700A, 0x8700B);     //declaration for FXOS8700 Accelerometer & Magnetometer as Adafruit sensor structure (?)
-char strAccelX[10];
-char strAccelY[10];
-char strAccelZ[10];
-char strMagX[10];
-char strMagY[10];
-char strMagZ[10];
-char strGyroX[10];
-char strGyroY[10];
-char strGyroZ[10];
 
 /*Communication - COM*/
 const byte ENABLE_PIN = 3;          //enable rs485-chip
@@ -51,7 +40,7 @@ SoftwareSerial rs485 (0, 1);        //receive pin, transmit pin
 //--------------------------------------begin sensor functions-------
 
 //--------------------------------------begin temperature read-------
-char SensorTempRead()                          //function to read and calculate the temperature
+float SensorTempRead()                          //function to read and calculate the temperature
   {
   uint8_t i;
   float average;
@@ -74,13 +63,12 @@ char SensorTempRead()                          //function to read and calculate 
   temp = 1.0 / temp;                           //Invert
   temp -= 273.15;                              //convert to degrees Celsius
   temp += TEMPCALIB;
-  dtostrf(temp, 4, 4, strTemp);
-  return(strTemp); 
+  return(temp); 
   }
 //--------------------------------------end temperature read--------
 
 //--------------------------------------begin turbidity read--------
-char SensorTurbRead()
+float SensorTurbRead()
 {
   float volt = 0;
   float turbidity;
@@ -98,8 +86,7 @@ char SensorTurbRead()
   {
     turbidity = -1120*square(volt)+5742*volt-1756.8;
   }
-  dtostrf(turbidity, 5, 1, strTurb);
-  return (strTurb);
+  return turbidity;
 }
 //--------------------------------------end turbidity read----------
 
@@ -130,6 +117,7 @@ char SensorCRead()
       //no data
       break;
   }
+
   while (Wire.available())
   {
     in_char = Wire.read();
@@ -144,27 +132,6 @@ char SensorCRead()
   return CData;
 }
 //--------------------------------------end conductivity read-------
-//--------------------------------------begin acceleration read-----
-char SensorARead()
-{
-  sensors_event_t gevent, aevent, mevent;
-  accelmag.getEvent(&aevent, &mevent);
-  gyro.getEvent(&gevent);
-  
-  dtostrf(aevent.acceleration.x, 3, 1, strAccelX);
-  dtostrf(aevent.acceleration.y, 3, 1, strAccelY);
-  dtostrf(aevent.acceleration.z, 3, 1, strAccelZ);
-  
-  dtostrf(mevent.magnetic.x, 3, 1, strMagX);
-  dtostrf(mevent.magnetic.y, 3, 1, strMagY);
-  dtostrf(mevent.magnetic.z, 3, 1, strMagZ);
-  
-  dtostrf(gevent.gyro.x, 3, 1, strGyroX);
-  dtostrf(gevent.gyro.y, 3, 1, strGyroY);
-  dtostrf(gevent.gyro.z, 3, 1, strGyroZ);
-  return(0);  
-}
-//--------------------------------------end accceletation read------
 //--------------------------------------end sensor functions--------
 
 //--------------------------------------begin setup-----------------
@@ -203,15 +170,40 @@ void setup()
 
 //--------------------------------------begin loop------------------
 void loop()
-{  
-  SensorTurbRead();
-  SensorTempRead();
+{
+  char strTurb[10];
+  char strTemp[10];
+  char strAccelX[10];
+  char strAccelY[10];
+  char strAccelZ[10];
+  char strMagX[10];
+  char strMagY[10];
+  char strMagZ[10];
+  char strGyroX[10];
+  char strGyroY[10];
+  char strGyroZ[10];
+  
+  dtostrf(SensorTurbRead(), 5, 1, strTurb);
+  dtostrf(SensorTempRead(), 4, 4, strTemp);
   SensorCRead();
-  SensorARead();
+
+  sensors_event_t gevent, aevent, mevent;
+  accelmag.getEvent(&aevent, &mevent);
+  gyro.getEvent(&gevent);
+  dtostrf(aevent.acceleration.x, 3, 1, strAccelX);
+  dtostrf(aevent.acceleration.y, 3, 1, strAccelY);
+  dtostrf(aevent.acceleration.z, 3, 1, strAccelZ);
+  
+  dtostrf(mevent.magnetic.x, 3, 1, strMagX);
+  dtostrf(mevent.magnetic.y, 3, 1, strMagY);
+  dtostrf(mevent.magnetic.z, 3, 1, strMagZ);
+  
+  dtostrf(gevent.gyro.x, 3, 1, strGyroX);
+  dtostrf(gevent.gyro.y, 3, 1, strGyroY);
+  dtostrf(gevent.gyro.z, 3, 1, strGyroZ);
   
   delay(1000);
-  
-  // send to master 
+  // send to slave  
   digitalWrite (ENABLE_PIN, HIGH);                //enable Communication over RS485 (sending)
   rs485.write(strTurb);                           //writes the Datastring to RS485
   rs485.write("NTU ");
