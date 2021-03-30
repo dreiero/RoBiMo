@@ -17,6 +17,7 @@ int TempSamples[TEMPNUMSAMPLES];    //array for temperature measurement samples
 
 /*Pressure - P*/
 #define PRESSPIN A2                 //analog input pin for pressure measurement
+#define PRESSNUMSAMPLES 10          //number of averaged samples
 
 /*Conductivity - C*/
 #define adress 100                  //default I2C ID number for EZO Electrical Conductivity Circuit
@@ -34,7 +35,7 @@ Adafruit_FXOS8700 accelmag = Adafruit_FXOS8700(0x8700A, 0x8700B);     //declarat
 
 /*Communication - COM*/
 const byte ENABLE_PIN = 3;          //enable rs485-chip
-const byte LED_PIN = 13;            //defines status LED pin
+//const byte LED_PIN = 13;            //defines status LED pin
 SoftwareSerial rs485 (0, 1);        //receive pin, transmit pin
 
 //--------------------------------------begin sensor functions-------
@@ -67,6 +68,20 @@ float SensorTempRead()                          //function to read and calculate
   }
 //--------------------------------------end temperature read--------
 
+//--------------------------------------begin pressure read---------
+float SensorPressRead()
+{
+  float volt = 0;
+  float pressure;
+  for(int i = 0; i < PRESSNUMSAMPLES; i++)
+  {
+    volt += ((float)analogRead(PRESSPIN)/1024)*5;
+  }
+  volt = volt/PRESSNUMSAMPLES;
+  return volt;
+}
+//--------------------------------------end pressure read-----------
+
 //--------------------------------------begin turbidity read--------
 float SensorTurbRead()
 {
@@ -91,15 +106,19 @@ float SensorTurbRead()
 //--------------------------------------end turbidity read----------
 
 //--------------------------------------begin conductivity read-----
-char SensorCRead()
+char SensorCAsk()
 {
-  int i = 0;                                  //counter for CData array
-  int time_ = 570;                            //changeable delay in depending on the command send to EC circuit
+  //int time_ = 570;                            //changeable delay in depending on the command send to EC circuit
   
   Wire.beginTransmission(adress);
   Wire.write('r');
   Wire.endTransmission();
-  delay(time_);
+}
+
+char SensorCRead()
+{ 
+  int i = 0;                                  //counter for CData array
+  //delay(time_);
   Wire.requestFrom(adress, 32, 1);
   code = Wire.read();
   switch (code)
@@ -129,7 +148,8 @@ char SensorCRead()
       break;
     }
   }
-  return CData;
+  return code;
+  //return CData;
 }
 //--------------------------------------end conductivity read-------
 //--------------------------------------end sensor functions--------
@@ -140,8 +160,8 @@ void setup()
   rs485.begin (9600);
   Wire.begin();
   pinMode (ENABLE_PIN, OUTPUT);                   // driver output enable
-  pinMode (LED_PIN, OUTPUT);                      // built-in LED
-  digitalWrite(LED_PIN, HIGH);
+  //pinMode (LED_PIN, OUTPUT);                      // built-in LED
+  //digitalWrite(LED_PIN, HIGH);
   
   if (!gyro.begin())
   {
@@ -150,7 +170,7 @@ void setup()
     rs485.write(" gyro not found! "); 
     digitalWrite(ENABLE_PIN, LOW);
     */
-    digitalWrite(LED_PIN, LOW);
+    //digitalWrite(LED_PIN, LOW);
     while (1);
   }
 
@@ -161,7 +181,7 @@ void setup()
     rs485.write(" accel/mag not found! "); 
     digitalWrite(ENABLE_PIN, LOW);
     */
-    digitalWrite(LED_PIN, LOW);
+    //digitalWrite(LED_PIN, LOW);
     while (1);
   }
 }
@@ -173,6 +193,7 @@ void loop()
 {
   char strTurb[10];
   char strTemp[10];
+  char strPress[10];
   char strAccelX[10];
   char strAccelY[10];
   char strAccelZ[10];
@@ -183,10 +204,73 @@ void loop()
   char strGyroY[10];
   char strGyroZ[10];
   
+  SensorCAsk();
+  
+  for( int i = 0; i < 50; i++ )
+  {
+    dtostrf(SensorTurbRead(), 5, 1, strTurb);
+    dtostrf(SensorTempRead(), 4, 4, strTemp);
+    dtostrf(SensorPressRead(), 4, 4, strPress);
+    
+    sensors_event_t gevent, aevent, mevent;
+    accelmag.getEvent(&aevent, &mevent);
+    gyro.getEvent(&gevent);
+    dtostrf(aevent.acceleration.x, 3, 1, strAccelX);
+    dtostrf(aevent.acceleration.y, 3, 1, strAccelY);
+    dtostrf(aevent.acceleration.z, 3, 1, strAccelZ);
+    
+    dtostrf(mevent.magnetic.x, 3, 1, strMagX);
+    dtostrf(mevent.magnetic.y, 3, 1, strMagY);
+    dtostrf(mevent.magnetic.z, 3, 1, strMagZ);
+    
+    dtostrf(gevent.gyro.x, 3, 1, strGyroX);
+    dtostrf(gevent.gyro.y, 3, 1, strGyroY);
+    dtostrf(gevent.gyro.z, 3, 1, strGyroZ);
+    
+    delay(10);
+    // send to slave  
+    digitalWrite (ENABLE_PIN, HIGH);                //enable Communication over RS485 (sending)
+    rs485.write("1 ");
+    rs485.write(strTurb);                           //writes the Datastring to RS485
+    rs485.write(" ");
+    
+    rs485.write(strTemp);
+    rs485.write(" ");
+
+    rs485.write("- "); //dummy-code to keep up the same format?
+     
+    rs485.write("A ");
+    rs485.write(strAccelX);
+    rs485.write(" ");
+    rs485.write(strAccelY);
+    rs485.write(" ");
+    rs485.write(strAccelZ);
+    
+    rs485.write(" M ");
+    rs485.write(strMagX);
+    rs485.write(" ");
+    rs485.write(strMagY);
+    rs485.write(" ");
+    rs485.write(strMagZ);
+    
+    rs485.write(" G ");
+    rs485.write(strGyroX);
+    rs485.write(" ");
+    rs485.write(strGyroY);
+    rs485.write(" ");
+    rs485.write(strGyroZ);
+    
+    rs485.write(" ");
+    rs485.write(strPress);
+      
+    rs485.write("\r\n");
+    digitalWrite (ENABLE_PIN, LOW);                 //disable RS485 COM
+  }
   dtostrf(SensorTurbRead(), 5, 1, strTurb);
   dtostrf(SensorTempRead(), 4, 4, strTemp);
+  dtostrf(SensorPressRead(), 4, 4, strPress);
   SensorCRead();
-
+  
   sensors_event_t gevent, aevent, mevent;
   accelmag.getEvent(&aevent, &mevent);
   gyro.getEvent(&gevent);
@@ -202,41 +286,44 @@ void loop()
   dtostrf(gevent.gyro.y, 3, 1, strGyroY);
   dtostrf(gevent.gyro.z, 3, 1, strGyroZ);
   
-  delay(1000);
+  //delay(5);
   // send to slave  
   digitalWrite (ENABLE_PIN, HIGH);                //enable Communication over RS485 (sending)
+  rs485.write("1 ");
   rs485.write(strTurb);                           //writes the Datastring to RS485
-  rs485.write("NTU ");
+  rs485.write(" ");
   
   rs485.write(strTemp);
-  rs485.write("°C ");
-
-  rs485.write(CData);
-  rs485.write("µS/cm ");
+  rs485.write(" ");
   
-  rs485.write("ACCEL [] X: ");
+  rs485.write(CData);
+  rs485.write(" ");
+     
+  rs485.write("A ");
   rs485.write(strAccelX);
-  rs485.write("Y: ");
+  rs485.write(" ");
   rs485.write(strAccelY);
-  rs485.write("Z: ");
+  rs485.write(" ");
   rs485.write(strAccelZ);
   
-  rs485.write("MAG [µTesla] X:");
+  rs485.write(" M ");
   rs485.write(strMagX);
-  rs485.write("Y: ");
+  rs485.write(" ");
   rs485.write(strMagY);
-  rs485.write("Z: ");
+  rs485.write(" ");
   rs485.write(strMagZ);
-
-  rs485.write("GYRO [rad/s] X: ");
+  
+  rs485.write(" G ");
   rs485.write(strGyroX);
-  rs485.write("Y: ");
+  rs485.write(" ");
   rs485.write(strGyroY);
-  rs485.write("Z: ");
+  rs485.write(" ");
   rs485.write(strGyroZ);
+  
+  rs485.write(" ");
+  rs485.write(strPress);
     
   rs485.write("\r\n");
-  digitalWrite (ENABLE_PIN, LOW);                 //disable RS485 COM
-
+  digitalWrite (ENABLE_PIN, LOW);                 //disable RS485 COM 
 }
 //--------------------------------------end loop--------------------
