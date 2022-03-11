@@ -23,8 +23,8 @@ int TempSamples[TEMPNUMSAMPLES];    //array for temperature measurement samples
 #define PRESSNUMSAMPLES 10          //number of averaged samples
 
 /*Conductivity - C*/
-#define i2c_id 0x64                     //default I2C address
-byte C_bus_address = i2c_id;              //holds the I2C address.
+#define Ci2c_id 0x64                     //default I2C address
+byte C_bus_address = Ci2c_id;              //holds the I2C address.
 
 /*Acceleration - A*/
 Adafruit_BNO055 bno = Adafruit_BNO055(55);
@@ -51,8 +51,8 @@ byte bytes_received_from_computer = 0;  //we need to know how many character byt
 
 union sensor_mem_handler                //declare the use of a union data type
 {
-  byte i2c_data[4];                   //define a 4 byte array in the union
-  long answ;              //define an long in the union
+  byte i2c_data[4];                     //define a 4 byte array in the union
+  long answ;                            //define an long in the union
 };
 
 union sensor_mem_handler move_data;     //declare that we will refer to the union as "move_data"
