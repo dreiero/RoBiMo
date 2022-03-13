@@ -54,9 +54,8 @@ union sensor_mem_handler                //declare the use of a union data type
   byte i2c_data[4];                     //define a 4 byte array in the union
   long answ;                            //define an long in the union
 };
-
 union sensor_mem_handler move_data;     //declare that we will refer to the union as "move_data"
-
+byte antwort;
 //--------------------------------------begin sensor functions-------
 
 //--------------------------------------begin temperature read-------
@@ -100,6 +99,28 @@ float SensorPressRead()
 //--------------------------------------end pressure read-----------
 
 //--------------------------------------begin common EC and pH functions
+byte request_reading(byte bus_address)
+{
+  byte nra = 0x07;
+  byte new_reading_availeable;
+  Wire.beginTransmission(bus_address);
+  Wire.write(nra);
+  Wire.endTransmission();
+  Wire.requestFrom(bus_address, (byte)1);
+  new_reading_availeable = Wire.read();
+  Wire.endTransmission(); 
+  return new_reading_availeable; 
+}
+
+void check_reading(byte bus_address, byte new_reading_availeable)
+{
+  byte nra = 0x07;
+  Wire.beginTransmission(bus_address);
+  Wire.write(nra);
+  Wire.write(0x00);
+  Wire.endTransmission();
+  new_reading_availeable = 0;
+}
 
 void temp_comp(char compensation[10])
 {                      
@@ -115,16 +136,18 @@ void temp_comp(char compensation[10])
 
 //************************************
 //************************************
-void i2c_read(byte reg, byte number_of_bytes_to_read, byte bus_adress)
+void i2c_read(byte reg, byte number_of_bytes_to_read, byte bus_address)
 {                                                                  //used to read 1,2,and 4 bytes: i2c_read(starting register,number of bytes to read)    
-  byte i;                                                          //counter
-  Wire.beginTransmission(bus_adress);                              //call the device by its ID number
+  byte i;                                                          //counter 
+  antwort = 0x00;
+  Wire.beginTransmission(bus_address);                              //call the device by its ID number
   Wire.write(reg);                                                 //transmit the register that we will start from
   Wire.endTransmission();                                          //end the I2C data transmission
-  Wire.requestFrom(bus_adress, (byte)number_of_bytes_to_read);     //call the device and request to read X bytes
-  for (i = number_of_bytes_to_read; i>0; i--)
+  Wire.requestFrom(bus_address,(byte) number_of_bytes_to_read);     //call the device and request to read X bytes
+  for (i = number_of_bytes_to_read; i > 0; i--)
   { 
-    move_data.i2c_data[i - 1] = Wire.read();
+    move_data.i2c_data[i-1] = Wire.read();
+    //antwort += move_data.i2c_data[i-1];
   }                                                                //with this code we read multiple bytes in reverse
   Wire.endTransmission();                                          //end the I2C data transmission  
 }
@@ -139,10 +162,10 @@ void i2c_write_byte(byte reg, byte data, byte bus_adress)
 }
 //***********************************
 //***********************************
-void i2c_write_long(byte reg, unsigned long data, byte bus_adress) 
+void i2c_write_long(byte reg, unsigned long data, byte bus_address) 
 {                                                                 //used to write a 4 bytes to a register: i2c_write_long(register to start at,unsigned long data )                     
   int i;                                                          //counter
-  Wire.beginTransmission(bus_adress);                             //call the device by its ID number
+  Wire.beginTransmission(bus_address);                             //call the device by its ID number
   Wire.write(reg);                                                //transmit the register that we will start from
   for (i = 3; i >= 0; i--)
   {                                                               //with this code we write multiple bytes in reverse
@@ -156,11 +179,11 @@ void i2c_write_long(byte reg, unsigned long data, byte bus_adress)
 //--------------------------------------begin conductivity read-----
 void set_probe() {
                                                                          
-  const byte set_probe_type_register = 0x08;                              //register to read
-  float k_value = 0.44;                                                      //used to hold the new k value
-  //atof(data_byte_1);                                          //convert the k value entered from a string to a float
-  k_value *= 100;                                                       //multiply by 100 to remove the decimal point
-  move_data.answ = k_value;                                             //move the float to an unsigned long
+  const byte set_probe_type_register = 0x08;                                //register to read
+  float k_value = 0.44;                                                     //used to hold the new k value
+  //atof(data_byte_1);                                                      //convert the k value entered from a string to a float
+  k_value *= 100;                                                           //multiply by 100 to remove the decimal point
+  move_data.answ = k_value;                                                 //move the float to an unsigned long
   i2c_write_byte(set_probe_type_register, move_data.i2c_data[1], C_bus_address);       //write the MSB of the k value to register 0x08
   i2c_write_byte(set_probe_type_register + 1, move_data.i2c_data[0], C_bus_address);   //write the LSB of the k value to register 0x09
 }
@@ -168,9 +191,9 @@ void set_probe() {
 float SensorCRead()
 {                                                                                    
   const byte conductivity_register = 0x18;                                                          //register to read
-  float conductivity = 0;                                                                           //used to hold the new conductivity value
+  float conductivity;                                                                           //used to hold the new conductivity value
   i2c_read(conductivity_register, four_byte_read, C_bus_address);                                                  //I2C_read(OEM register, number of bytes to read)
-  conductivity = move_data.answ;                                                                    //move the 4 bytes read into a float
+  conductivity = move_data.answ;     //antwort;                                                               //move the 4 bytes read into a float
   conductivity /= 100;                                                                              //divide by 100 to get the decimal point
   return conductivity;                                                                    //print info from register block
 }
@@ -180,10 +203,10 @@ float SensorCRead()
 //--------------------------------------begin pH read---------------
 float SensorpHRead()
 {
-  const byte pH_register = 0x16;                  //register to read
-  float pH = 0;                         //used to hold the new pH value
-  i2c_read(pH_register, four_byte_read, pH_bus_address);              //I2C_read(OEM register, number of bytes to read)                  
-  pH = move_data.answ;                      //move the 4 bytes read into a float
+  const byte pH_register = 0x16;                          //register to read
+  float pH;                                           //used to hold the new pH value
+  i2c_read(pH_register, four_byte_read, pH_bus_address);  //I2C_read(OEM register, number of bytes to read)                  
+  pH = move_data.answ;     //antwort;                               //move the 4 bytes read into a float
   pH /= 1000;
   return pH; 
 }
@@ -208,6 +231,28 @@ void setup()
   bno.setExtCrystalUse(true);
   set_probe();
   digitalWrite(13,HIGH);
+  delay(1000);
+  
+//  byte i2c_device_address = 0x65;
+//  byte led_reg = 0x05;
+//  Wire.beginTransmission(i2c_device_address);
+//  Wire.write(led_reg);
+//  Wire.write(0x01);
+//  Wire.endTransmission();
+
+  byte i2c_device_address1 = 0x64;
+  byte i2c_device_address2 = 0x65;
+  byte active_reg = 0x06;
+  Wire.beginTransmission(i2c_device_address1);
+  Wire.write(active_reg);
+  Wire.write(0x01);
+  Wire.endTransmission();
+
+  Wire.beginTransmission(i2c_device_address2);
+  Wire.write(active_reg);
+  Wire.write(0x01);
+  Wire.endTransmission();
+
 }
 
 //--------------------------------------end setup-------------------
@@ -218,12 +263,16 @@ void loop()
   char answer(10);
   char strTemp[10];
   char strPress[10];
-  char strpH[10];
+  char strpH[7];
+  float pH=0;
+  float C=0;
   char strC[10];
   char OrientationX[10];
   char OrientationY[10];
   char OrientationZ[10];
-  
+  byte reading_readyC = 0;
+  byte reading_readypH = 0;
+
   //if (rs485.available())
   //{
   //  answer = rs485.read();
@@ -232,27 +281,43 @@ void loop()
       /* Get a new orientation sensor event */ 
       sensors_event_t event; 
       bno.getEvent(&event);
+
       /*read analog sensors and data from orientation sensor*/
-      dtostrf(SensorTempRead(), 4, 4, strTemp);
-      dtostrf(SensorPressRead(), 4, 4, strPress);
+      dtostrf(SensorTempRead(), 4, 2, strTemp);
+      dtostrf(SensorPressRead(), 4, 3, strPress);
       dtostrf(event.orientation.x, 4, 1, OrientationX);
       dtostrf(event.orientation.y, 4, 1, OrientationY);
       dtostrf(event.orientation.z, 4, 1, OrientationZ);
+      /*see if new readings are availeable*/
+      reading_readyC = request_reading(C_bus_address);
+      reading_readypH = request_reading(pH_bus_address);
       /*send current temp to pH and EC Chip for temp-compensation*/
       temp_comp(strTemp);
       /*read data from pH and EC chips*/
-      dtostrf(SensorCRead(),4,4, strC);
-      dtostrf(SensorpHRead(), 4, 4, strpH);
-
+      //dtostrf(SensorCRead(), 4, 4, strC);
+      //dtostrf(SensorpHRead(), 5, 2, strpH);
+      if (reading_readyC == 1)
+      {
+        C = SensorCRead();
+        check_reading(C_bus_address, reading_readyC);
+        digitalWrite(13,LOW);
+      }
+      if (reading_readypH == 1)
+      {
+        pH = SensorpHRead();
+        check_reading(pH_bus_address, reading_readypH);
+        digitalWrite(13,LOW);
+      }
+      
       /*Senden der Daten mit ID*/
       digitalWrite (ENABLE_PIN, HIGH);                //enable Communication over RS485 (sending)
       rs485.write(KnotenID);
       rs485.write(",T,");                             
       rs485.write(strTemp);
       rs485.write(",pH,");
-      rs485.write(strpH);
-      rs485.write(",EC,");
-      rs485.write(strC);     
+      rs485.print(pH);
+      rs485.write(",EC,");     
+      rs485.print(C);
       rs485.write(",A,"); 
       rs485.write(OrientationX);
       rs485.write(",");
@@ -264,9 +329,7 @@ void loop()
       rs485.write("\r\n");
       digitalWrite (ENABLE_PIN, LOW);                 //disable RS485 COM
    // }
-    delay(500);
-    digitalWrite(13,LOW);
-    delay(500);
+    delay(1000);
     digitalWrite(13,HIGH);
   //}  
 }
