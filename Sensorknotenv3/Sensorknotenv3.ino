@@ -1,4 +1,4 @@
-#include <SoftwareSerial.h>         //enables multiple Serials, esp. for RS485
+//#include <SoftwareSerial.h>         //enables multiple Serials, esp. for RS485
 #include <stdio.h>
 #include <Wire.h>                   //enables I2C for pH, EC and Orientation Chip Communication
 #include <Adafruit_Sensor.h>
@@ -6,7 +6,7 @@
 #include <utility/imumaths.h>
   
 /*globale Definitionen*/
-char KnotenID = "K1";
+int KnotenID = 1;
 
 /*Temperature - TEMP*/
 #define SERIESRESISTOR 10000        //used reference resistor
@@ -19,7 +19,7 @@ char KnotenID = "K1";
 int TempSamples[TEMPNUMSAMPLES];    //array for temperature measurement samples
 
 /*Pressure - P*/
-#define PRESSPIN A1                 //analog input pin for pressure measurement
+#define PRESSPIN A2                 //analog input pin for pressure measurement
 #define PRESSNUMSAMPLES 10          //number of averaged samples
 
 /*Conductivity - C*/
@@ -34,9 +34,10 @@ Adafruit_BNO055 bno = Adafruit_BNO055(55);
 byte pH_bus_address = pHi2c_id;              //holds the I2C address
 
 /*Communication - COM*/
-const byte ENABLE_PIN = 3;          //enable rs485-chip
-//const byte LED_PIN = 13;            //defines status LED pin
-SoftwareSerial rs485 (0, 1);        //receive pin, transmit pin
+//const byte ENABLE_PIN = 7;          //enable rs485-chip
+#define ENABLE_PIN 7
+const byte LED_PIN = 13;            //defines status LED pin
+//SoftwareSerial rs485 (0, 1);        //receive pin, transmit pin
 
 /*Common I2C tasks*/
 #define one_byte_read 0x01              //used in a function to read data from the device  
@@ -122,6 +123,15 @@ void check_reading(byte bus_address, byte new_reading_availeable)
   new_reading_availeable = 0;
 }
 
+void hybernate(byte bus_address)
+{
+  byte nra = 0x06;
+  Wire.beginTransmission(bus_address);
+  Wire.write(nra);
+  Wire.write(0x00);
+  Wire.endTransmission();
+}
+
 void temp_comp(char compensation[10])
 {                      
   const byte pH_temperature_compensation_register = 0x0E;         //register to write pH
@@ -193,7 +203,7 @@ float SensorCRead()
   const byte conductivity_register = 0x18;                                                          //register to read
   float conductivity;                                                                           //used to hold the new conductivity value
   i2c_read(conductivity_register, four_byte_read, C_bus_address);                                                  //I2C_read(OEM register, number of bytes to read)
-  conductivity = move_data.answ;     //antwort;                                                               //move the 4 bytes read into a float
+  conductivity = move_data.answ;                  //answer; move the 4 bytes read into a float
   conductivity /= 100;                                                                              //divide by 100 to get the decimal point
   return conductivity;                                                                    //print info from register block
 }
@@ -217,20 +227,28 @@ float SensorpHRead()
 //--------------------------------------begin setup-----------------
 void setup()
 {
-  rs485.begin (9600);
+  //rs485.begin (9600);
   Wire.begin();
+  Serial1.begin(9600);
+  while(!Serial1)
+  {
+    ;
+    }
+  
   pinMode (ENABLE_PIN, OUTPUT);                   // driver output enable
-  pinMode (13, OUTPUT);                           // LED output enable
+  pinMode (LED_PIN, OUTPUT);
+  pinMode (4,OUTPUT);// LED output enable
   
   /* Initialise the sensor */
   if(!bno.begin())
   {
     while(1);
   }
-  delay(1000);
+//  delay(1000);
   bno.setExtCrystalUse(true);
   set_probe();
-  digitalWrite(13,HIGH);
+  digitalWrite(13, HIGH);
+  digitalWrite(4, HIGH);
   delay(1000);
   
 //  byte i2c_device_address = 0x65;
@@ -242,17 +260,17 @@ void setup()
 
   byte i2c_device_address1 = 0x64;
   byte i2c_device_address2 = 0x65;
-  byte active_reg = 0x06;
+  byte active_reg = 0x05;
   Wire.beginTransmission(i2c_device_address1);
   Wire.write(active_reg);
-  Wire.write(0x01);
+  Wire.write(0x00);
   Wire.endTransmission();
-
+  
   Wire.beginTransmission(i2c_device_address2);
   Wire.write(active_reg);
-  Wire.write(0x01);
+  Wire.write(0x00);
   Wire.endTransmission();
-
+  delay(1000);
 }
 
 //--------------------------------------end setup-------------------
@@ -278,6 +296,8 @@ void loop()
   //  answer = rs485.read();
   //  if (answer == KnotenID)
   //  {
+  digitalWrite(13,LOW);
+  digitalWrite(4,LOW);
       /* Get a new orientation sensor event */ 
       sensors_event_t event; 
       bno.getEvent(&event);
@@ -300,37 +320,46 @@ void loop()
       {
         C = SensorCRead();
         check_reading(C_bus_address, reading_readyC);
-        digitalWrite(13,LOW);
+        //digitalWrite(13,LOW);
       }
       if (reading_readypH == 1)
       {
         pH = SensorpHRead();
         check_reading(pH_bus_address, reading_readypH);
-        digitalWrite(13,LOW);
+        //digitalWrite(13,LOW);
       }
-      
+      //Serial.println(strTemp);
+//      Serial.println(pH);
+//      Serial.println(C);
+//      Serial.println(strPress);
+//      Serial.println(OrientationX);
+//      Serial.println(OrientationY);
+//      Serial.println(OrientationZ);
       /*Senden der Daten mit ID*/
       digitalWrite (ENABLE_PIN, HIGH);                //enable Communication over RS485 (sending)
-      rs485.write(KnotenID);
-      rs485.write(",T,");                             
-      rs485.write(strTemp);
-      rs485.write(",pH,");
-      rs485.print(pH);
-      rs485.write(",EC,");     
-      rs485.print(C);
-      rs485.write(",A,"); 
-      rs485.write(OrientationX);
-      rs485.write(",");
-      rs485.write(OrientationY);
-      rs485.write(",");
-      rs485.write(OrientationZ);
-      rs485.write(",p,");
-      rs485.write(strPress);
-      rs485.write("\r\n");
+      
+      Serial1.print(KnotenID);
+      Serial1.print(",T,");                             
+      Serial1.print(strTemp);
+      Serial1.print(",pH,");
+      Serial1.print(pH);
+      Serial1.print(",EC,");     
+      Serial1.print(C);
+      Serial1.print(",A,"); 
+      Serial1.print(OrientationX);
+      Serial1.print(",");
+      Serial1.print(OrientationY);
+      Serial1.print(",");
+      Serial1.print(OrientationZ);
+      Serial1.print(",p,");
+      Serial1.print(strPress);
+      Serial1.print("\r\n");
+      delay(1000);
       digitalWrite (ENABLE_PIN, LOW);                 //disable RS485 COM
    // }
-    delay(1000);
+    digitalWrite(4,HIGH);
     digitalWrite(13,HIGH);
+    delay(1000);
   //}  
 }
 //--------------------------------------end loop--------------------
