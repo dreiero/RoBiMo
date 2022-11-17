@@ -1,12 +1,12 @@
 
 /*Temperature - TEMP*/
-#define SERIESRESISTOR 10000            //used reference resistor
+const int SERIESRESISTOR = 10000;       //used reference resistor
 #define THERMISTORPIN A0                //analog input pin for temperature data
-#define TEMPERATURENOMINAL 25           //temperature for nominal thermistor value
-#define TEMPNUMSAMPLES 10               //number of averaged 
-#define BCOEFFICIENT 3950               //coefficient for sensor calibration
-#define THERMISTORNOMINAL 10000         //normal resistance for nominal thermistor temperature
-int TempSamples[TEMPNUMSAMPLES];        //array for temperature measurement samples
+const int TEMPERATURENOMINAL = 25;      //temperature for nominal thermistor value
+const int TEMPNUMSAMPLES = 10;          //number of averaged 
+const int BCOEFFICIENT = 3950;          //coefficient for sensor calibration
+const int THERMISTORNOMINAL = 10000;    //normal resistance for nominal thermistor temperature
+const int TempSamples[TEMPNUMSAMPLES];  //array for temperature measurement samples
 //************************************
 //************************************
 /*Pressure - P*/

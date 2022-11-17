@@ -25,14 +25,14 @@
 #include "RoBiMo.h"
   
 /*globale Definitionen*/
-#define DEBUG 0                     //1 = DEBUG mode on | 0 = DEBUG mode off | sends additional info through the USB Serial ("Serial"). 
-#define QUERYMODE 1                 //1 = waiting for Master | 0 = sending all the time | decides whether the node should push his new measurements as fast as possible or wait for a query asking him to send
-#define PROGRAMVERS 3.0             //description of program version
-char KnotenID[] = "K1";             //ID as a beginning for the 
-#define TEMPCALIB 0                 //Temperature calibration factor, gets added as the last step in temperature measurement
-#define PRESSCALIB 0                //Pressure calibration factor, gets added as the last step in Pressure measurement
-#define KVALUE 0.44                 //K value of the electrical conductivity electrodes (for IST-AG electrodes use 0.44)
-#define TIMEOUT 100                  //Timeout for the RS485 Serial ("Serial1"). default from the library is 1000, changed to 100 for faster responses
+const int DEBUG = 0;                //1 = DEBUG mode on | 0 = DEBUG mode off | sends additional info through the USB Serial ("Serial"). 
+int QUERYMODE = 1;            //1 = waiting for Master | 0 = sending all the time | decides whether the node should push his new measurements as fast as possible or wait for a query asking him to send
+const float PROGRAMVERS = 3.0;      //description of program version
+const char KnotenID[] = "K1";       //ID as a beginning for the 
+const int TEMPCALIB = 0;            //Temperature calibration factor, gets added as the last step in temperature measurement
+const int PRESSCALIB = 0;           //Pressure calibration factor, gets added as the last step in Pressure measurement
+const float KVALUE = 0.44;          //K value of the electrical conductivity electrodes (for IST-AG electrodes use 0.44)
+const int TIMEOUT = 100;            //Timeout for the RS485 Serial ("Serial1"). default from the library is 1000, changed to 100 for faster responses
 //--------------------------------------begin sensor functions-------
 //--------------------------------------begin temperature read-------
 float SensorTempRead()                          //function to read and calculate the temperature
@@ -122,6 +122,7 @@ void setup()
   pinMode (ENABLE_PIN, OUTPUT);                   // driver output enable
   pinMode (LED_PIN, OUTPUT);
   pinMode (4,OUTPUT);// LED output enable
+  //**************************************
   /* Initialise the sensor */
   bno.begin();
 //  if(!bno.begin())
@@ -134,24 +135,23 @@ void setup()
   digitalWrite(13, HIGH);
   digitalWrite(4, HIGH);
   delay(1000);
-//  byte i2c_device_address = 0x65;                 //write LED-register for both pH and EC Chip, default: blinking
-//  byte led_reg = 0x05;
-//  Wire.beginTransmission(i2c_device_address);
+//**************************************
+//  byte led_reg = 0x05;                            //LED register; default: blinking 
+//  Wire.beginTransmission(C_bus_address);
 //  Wire.write(led_reg);
 //  Wire.write(0x01);                               //0x01 for blinking each measurement | 0x00 for power saving mode, LED are always off
 //  Wire.endTransmission();
-//  byte i2c_device_address1 = 0x64;                //write Hibernation register for EC Chip
-//  byte i2c_device_address2 = 0x65;                //write Hibernation register for pH Chip
-//  byte active_reg = 0x06;                         //Hibernation register
-//  Wire.beginTransmission(i2c_device_address1);
-//  Wire.write(active_reg);
-//  Wire.write(0x01);                               //0x01 for waking | 0x00 for hibernation
-//  Wire.endTransmission();
-//  Wire.beginTransmission(i2c_device_address2);
-//  Wire.write(active_reg);
-//  Wire.write(0x01);
-//  Wire.endTransmission();
-//  delay(1000);
+//**************************************
+  byte active_reg = 0x06;                         //Hibernation register
+  Wire.beginTransmission(C_bus_address);
+  Wire.write(active_reg);
+  Wire.write(0x01);                               //0x01 for waking | 0x00 for hibernation
+  Wire.endTransmission();
+  Wire.beginTransmission(pH_bus_address);
+  Wire.write(active_reg);
+  Wire.write(0x01);
+  Wire.endTransmission();
+  delay(1000);
 if (DEBUG == 1)
 {
   Serial.println("Debug mode started");
@@ -199,6 +199,11 @@ void loop()
         
         go = 0;
       }
+      else if (answer == "fastMeasure")
+      {
+        QUERYMODE = 0;
+        go = 1;
+      }
       else
       {
         go = 0;
@@ -207,6 +212,10 @@ void loop()
   }
   else
   {
+    if (Serial1.available() > 0)
+    {
+      QUERYMODE = 1;
+    }
     go = 1;
   }
   if (go == 1)
