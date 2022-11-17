@@ -11,4 +11,4 @@ toDo:
 - [ ] Wechsel zwischen Query modus und schnellem Modus während der Laufzeit des Programms 
 
 
-veraltet: Die .bas Datei ist ein Excel VBA Makro, um leicht kommaseparierte .csv-Dateien umzuwandeln.
+veraltet: ~~Die .bas Datei ist ein Excel VBA Makro, um leicht kommaseparierte .csv-Dateien umzuwandeln.~~
