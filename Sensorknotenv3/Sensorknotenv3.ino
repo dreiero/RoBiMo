@@ -14,7 +14,8 @@
  *                                added USB-Serial ("Serial"), different from RS485-Serial ("Serial1")
  *                                added debug mode
  *                                added query mode
- *                                ToDo: added calibration
+ *                                added calibration for pH
+ *                                ToDo: added calibration for EC
  */
 #include <stdio.h>
 #include <Wire.h>                   //enables I2C for pH, EC and Orientation Chip Communication
@@ -29,85 +30,8 @@ const int DEBUG = 0;                //1 = DEBUG mode on | 0 = DEBUG mode off | s
 int QUERYMODE = 1;            //1 = waiting for Master | 0 = sending all the time | decides whether the node should push his new measurements as fast as possible or wait for a query asking him to send
 const float PROGRAMVERS = 3.0;      //description of program version
 const char KnotenID[] = "K1";       //ID as a beginning for the 
-const int TEMPCALIB = 0;            //Temperature calibration factor, gets added as the last step in temperature measurement
-const int PRESSCALIB = 0;           //Pressure calibration factor, gets added as the last step in Pressure measurement
-const float KVALUE = 0.44;          //K value of the electrical conductivity electrodes (for IST-AG electrodes use 0.44)
 const int TIMEOUT = 100;            //Timeout for the RS485 Serial ("Serial1"). default from the library is 1000, changed to 100 for faster responses
-//--------------------------------------begin sensor functions-------
-//--------------------------------------begin temperature read-------
-float SensorTempRead()                          //function to read and calculate the temperature
-  {
-  uint8_t i;
-  float average;
-  float temp;
-  average = 0;
-  for (i=0; i<TEMPNUMSAMPLES; i++)
-    {average += analogRead(THERMISTORPIN);
-    delay(10);}
-  average = average / TEMPNUMSAMPLES;
-  average = 1023 / average -1;
-  average = SERIESRESISTOR / average;
-  temp = average / THERMISTORNOMINAL;          //(R/Ro)
-  temp = log(temp);                            //ln(R/Ro)
-  temp = temp / BCOEFFICIENT;                  //1/B * ln(R/Ro)
-  temp += 1.0 / (TEMPERATURENOMINAL + 273.15); //+ (1/To)
-  temp = 1.0 / temp;                           //Invert
-  temp -= 273.15;                              //convert to degrees Celsius
-  temp += TEMPCALIB;
-  return(temp); 
-  }
-//--------------------------------------end temperature read--------
 
-//--------------------------------------begin pressure read---------
-float SensorPressRead()
-{
-  float volt = 0;
-  float pressure;
-  for(int i = 0; i < PRESSNUMSAMPLES; i++)
-  {
-    volt += ((float)analogRead(PRESSPIN) / 1024) * 5;
-  }
-  volt = volt / PRESSNUMSAMPLES;
-  volt += PRESSCALIB;
-  return volt;
-}
-//--------------------------------------end pressure read-----------
-
-//--------------------------------------begin conductivity read-----
-void set_probe() {                                                                        
-  const byte set_probe_type_register = 0x08;                                            //register to read
-  float k_value = KVALUE;                                                                 //used to hold the new k value
-  //atof(data_byte_1);                                                                  //convert the k value entered from a string to a float
-  k_value *= 100;                                                                       //multiply by 100 to remove the decimal point
-  move_data.answ = k_value;                                                             //move the float to an unsigned long
-  i2c_write_byte(set_probe_type_register, move_data.i2c_data[1], C_bus_address);        //write the MSB of the k value to register 0x08
-  i2c_write_byte(set_probe_type_register + 1, move_data.i2c_data[0], C_bus_address);    //write the LSB of the k value to register 0x09
-}
-//---------------------------
-float SensorCRead()
-{                                                                                    
-  const byte conductivity_register = 0x18;                        //register to read
-  float conductivity;                                             //used to hold the new conductivity value
-  i2c_read(conductivity_register, four_byte_read, C_bus_address); //I2C_read(OEM register, number of bytes to read)
-  conductivity = move_data.answ;                                  //answer; move the 4 bytes read into a float
-  conductivity /= 100;                                            //divide by 100 to get the decimal point
-  return conductivity;                                            //print info from register block
-}
-//--------------------------------------end conductivity read-------
-
-//--------------------------------------begin pH read---------------
-float SensorpHRead()
-{
-  const byte pH_register = 0x16;                          //register to read
-  float pH;                                           //used to hold the new pH value
-  i2c_read(pH_register, four_byte_read, pH_bus_address);  //I2C_read(OEM register, number of bytes to read)                  
-  pH = move_data.answ;     //antwort;                               //move the 4 bytes read into a float
-  pH /= 1000;
-  return pH; 
-}
-//--------------------------------------end pH read-----------------
-
-//--------------------------------------end sensor functions--------
 
 //--------------------------------------begin setup-----------------
 void setup()
@@ -194,15 +118,21 @@ void loop()
       {
         go = 1;
       }
-      else if (answer == "pHCalib")
-      {
-        
-        go = 0;
-      }
       else if (answer == "fastMeasure")
       {
         QUERYMODE = 0;
         go = 1;
+      }
+      else if (answer.indexOf("pHCalib") != -1)
+      {
+        if (answer.indexOf(KnotenID) == 0)
+        {
+//          digitalWrite(ENABLE_PIN,HIGH); //Test values
+//          Serial1.print("test");
+//          delay(100);
+//          digitalWrite(ENABLE_PIN,LOW);
+          pHcalibration();
+        }
       }
       else
       {
@@ -210,15 +140,20 @@ void loop()
       }
     }
   }
-  else
+  else                            //not in query mode ==> fast measurement
   {
-    if (Serial1.available() > 0)
+    go = 0;
+    if (Serial1.available() > 0)  //if the node can read any message on the RS485 bus ==> switch to query mode
     {
       QUERYMODE = 1;
     }
-    go = 1;
+    else                          //if no message on bus ==> send your own
+    {
+      go = 1;
+    }
   }
-  if (go == 1)
+  
+ if (go == 1)                     //regardless of measuring mode, if go == 1 then send some data!
   {
     digitalWrite(4,LOW);
     /* Get a new orientation sensor event */ 
@@ -246,7 +181,7 @@ void loop()
       pH = SensorpHRead();
       check_reading(pH_bus_address, reading_readypH);
     }
-    if(DEBUG == 1)                  //DEBUG mode only!
+    if(DEBUG == 1)                  //DEBUG mode only! ==> sending via USB
     {
       Serial.print(KnotenID);
       Serial.print(",T,");                             
@@ -287,8 +222,8 @@ void loop()
     delay(100);
     digitalWrite (ENABLE_PIN, LOW);   //disable RS485 COM
     digitalWrite(4,HIGH);
-  }
-  delay(100);
+  }           //end of "if go == 1" ==> end of data to send
+  delay(100); //animate the red LED (fast blink), once per loop-function run
   digitalWrite(13,HIGH);
   delay(100);  
 }
