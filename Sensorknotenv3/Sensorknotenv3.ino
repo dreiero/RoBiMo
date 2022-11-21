@@ -1,5 +1,8 @@
 /*
- * Sensorknotenv3.ino - program to control the ROBiMo sensor nodes
+ * Sensorknotenv3.ino - program to control the project ROBiMo sensor nodes
+ * last tested: 11/2022
+ * written for Adafruit ItsyBitsy 5V by Otto Dreier (@dreiero on GitHub)
+ * 
  * veraion 1.0 - initial program:
  *                                simple sensors (no pH)
  *                                PCB using Adafruit Trinket Pro 5V
@@ -15,7 +18,7 @@
  *                                added debug mode
  *                                added query mode
  *                                added calibration for pH
- *                                ToDo: added calibration for EC
+ *                                added calibration for EC
  */
 #include <stdio.h>
 #include <Wire.h>                   //enables I2C for pH, EC and Orientation Chip Communication
@@ -26,21 +29,26 @@
 #include "RoBiMo.h"
   
 /*globale Definitionen*/
-const int DEBUG = 0;                //1 = DEBUG mode on | 0 = DEBUG mode off | sends additional info through the USB Serial ("Serial"). 
-int QUERYMODE = 1;            //1 = waiting for Master | 0 = sending all the time | decides whether the node should push his new measurements as fast as possible or wait for a query asking him to send
-const float PROGRAMVERS = 3.0;      //description of program version
-const char KnotenID[] = "K1";       //ID as a beginning for the 
-const int TIMEOUT = 100;            //Timeout for the RS485 Serial ("Serial1"). default from the library is 1000, changed to 100 for faster responses
-
+namespace constants
+{
+  extern const int DEBUG = 0;               //1 = DEBUG mode on | 0 = DEBUG mode off | sends additional info through the USB Serial ("Serial"). 
+  extern const float PROGRAMVERS = 3.0;     //description of program version
+  extern const char KnotenID[] = "K1";      //ID as a beginning for the 
+  extern const int TIMEOUT = 100;           //Timeout for the RS485 Serial ("Serial1"). default from the library is 1000, changed to 100 for faster responses
+  extern const int TEMPCALIB = 0;           //Temperature calibration factor, gets added as the last step in temperature measurement
+  extern const int PRESSCALIB = 0;          //Pressure calibration factor, gets added as the last step in Pressure measurement
+  extern const float KVALUE = 0.44;         //K value of the electrical conductivity electrodes (for IST-AG electrodes use 0.44)
+}
+int QUERYMODE = 1;                          //1 = waiting for Master | 0 = sending all the time | decides whether the node should push his new measurements as fast as possible or wait for a query asking him to send
 
 //--------------------------------------begin setup-----------------
 void setup()
 {
-  if(DEBUG == 1)                                  //DEBUG only
+  if(constants::DEBUG == 1)                                  //DEBUG only
   {Serial.begin(9600);}                           //start USB-Serial connection
   Wire.begin();
   Serial1.begin(9600);
-  Serial1.setTimeout(TIMEOUT);
+  Serial1.setTimeout(constants::TIMEOUT);
   while(!Serial1)
   {while(1);}
   pinMode (ENABLE_PIN, OUTPUT);                   // driver output enable
@@ -76,11 +84,11 @@ void setup()
   Wire.write(0x01);
   Wire.endTransmission();
   delay(1000);
-if (DEBUG == 1)
+if (constants::DEBUG == 1)
 {
   Serial.println("Debug mode started");
   Serial.print("Program version ");
-  Serial.println(PROGRAMVERS);
+  Serial.println(constants::PROGRAMVERS);
 }
 
 }
@@ -110,28 +118,47 @@ void loop()
     {
       answer = Serial1.readString();
       answer.trim();
-      if (DEBUG == 1)
+      if (constants::DEBUG == 1)
       {
         Serial.println(answer);
       }
-      if (answer == KnotenID)
+      if (answer == constants::KnotenID)
       {
         go = 1;
       }
-      else if (answer == "fastMeasure")
+      else if (answer.indexOf("fastMeasure") != -1)
       {
-        QUERYMODE = 0;
-        go = 1;
+        if (answer.indexOf(constants::KnotenID) == 0)
+        {
+          QUERYMODE = 0;
+          go = 1;
+        }
+        else
+        {
+          QUERYMODE = 1;
+          go = 0;
+        }
       }
       else if (answer.indexOf("pHCalib") != -1)
       {
-        if (answer.indexOf(KnotenID) == 0)
+        if (answer.indexOf(constants::KnotenID) == 0)
         {
-//          digitalWrite(ENABLE_PIN,HIGH); //Test values
-//          Serial1.print("test");
-//          delay(100);
-//          digitalWrite(ENABLE_PIN,LOW);
+          if (constants::DEBUG == 1)
+          {
+            Serial.println("pH calibration started");
+          }
           pHcalibration();
+        }
+      }
+      else if (answer.indexOf("CCalib") != -1)
+      {
+        if (answer.indexOf(constants::KnotenID) == 0)
+        {
+          if (constants::DEBUG == 1)
+          {
+            Serial.println("EC calibration started");
+          }
+          Ccalibration();
         }
       }
       else
@@ -181,9 +208,9 @@ void loop()
       pH = SensorpHRead();
       check_reading(pH_bus_address, reading_readypH);
     }
-    if(DEBUG == 1)                  //DEBUG mode only! ==> sending via USB
+    if(constants::DEBUG == 1)                  //DEBUG mode only! ==> sending via USB
     {
-      Serial.print(KnotenID);
+      Serial.print(constants::KnotenID);
       Serial.print(",T,");                             
       Serial.print(strTemp);
       Serial.print(",pH,");
@@ -203,7 +230,7 @@ void loop()
     delay(100);
     /*Senden der Daten mit ID*/
     digitalWrite (ENABLE_PIN, HIGH);  //enable Communication over RS485 (sending)
-    Serial1.print(KnotenID);
+    Serial1.print(constants::KnotenID);
     Serial1.print(",T,");                             
     Serial1.print(strTemp);
     Serial1.print(",pH,");

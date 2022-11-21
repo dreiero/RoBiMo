@@ -1,6 +1,21 @@
-const int TEMPCALIB = 0;            //Temperature calibration factor, gets added as the last step in temperature measurement
-const int PRESSCALIB = 0;           //Pressure calibration factor, gets added as the last step in Pressure measurement
-const float KVALUE = 0.44;          //K value of the electrical conductivity electrodes (for IST-AG electrodes use 0.44)
+/*
+ * RoBiMo.h header for Sensorknoten.ino to control the project RoBiMo sensor nodes 
+ * last tested: 21/2022
+ * written for adafruit ItsyBitsy 5V by Otto Dreier (@dreiero on GitHub)
+ * 
+ */
+
+
+namespace constants
+{
+  extern const int DEBUG;                //1 = DEBUG mode on | 0 = DEBUG mode off | sends additional info through the USB Serial ("Serial"). 
+  extern const float PROGRAMVERS;      //description of program version
+  extern const char KnotenID[];       //ID as a beginning for the 
+  extern const int TIMEOUT;            //Timeout for the RS485 Serial ("Serial1"). default from the library is 1000, changed to 100 for faster responses
+  extern const int TEMPCALIB;            //Temperature calibration factor, gets added as the last step in temperature measurement
+  extern const int PRESSCALIB;           //Pressure calibration factor, gets added as the last step in Pressure measurement
+  extern const float KVALUE;          //K value of the electrical conductivity electrodes (for IST-AG electrodes use 0.44)
+}
 
 /*Temperature - TEMP*/
 const int SERIESRESISTOR = 10000;       //used reference resistor
@@ -169,7 +184,7 @@ float SensorTempRead()                          //function to read and calculate
   temp += 1.0 / (TEMPERATURENOMINAL + 273.15); //+ (1/To)
   temp = 1.0 / temp;                           //Invert
   temp -= 273.15;                              //convert to degrees Celsius
-  temp += TEMPCALIB;
+  temp += constants::TEMPCALIB;
   return(temp); 
   }
 //--------------------------------------end temperature read--------
@@ -184,7 +199,7 @@ float SensorPressRead()
     volt += ((float)analogRead(PRESSPIN) / 1024) * 5;
   }
   volt = volt / PRESSNUMSAMPLES;
-  volt += PRESSCALIB;
+  volt += constants::PRESSCALIB;
   return volt;
 }
 //--------------------------------------end pressure read-----------
@@ -192,7 +207,7 @@ float SensorPressRead()
 //--------------------------------------begin conductivity read-----
 void set_probe() {                                                                        
   const byte set_probe_type_register = 0x08;                                            //register to read
-  float k_value = KVALUE;                                                                 //used to hold the new k value
+  float k_value = constants::KVALUE;                                                                 //used to hold the new k value
   //atof(data_byte_1);                                                                  //convert the k value entered from a string to a float
   k_value *= 100;                                                                       //multiply by 100 to remove the decimal point
   move_data.answ = k_value;                                                             //move the float to an unsigned long
@@ -222,10 +237,11 @@ float SensorpHRead()
   return pH; 
 }
 //--------------------------------------end pH read-----------------
-//************************************
+//**************************************
 //--------------------------------------end sensor functions--------
-//************************************
-//************************************
+//**************************************
+//--------------------------------------begin pH Calibration--------
+//**************************************
 void pHcalibration()
 {
   const byte calibration_value_register = 0x08;           //register to read / write
@@ -261,17 +277,26 @@ void pHcalibration()
     if (Serial1.available() > 0)
     {
       Serial1.readString();
-      Serial.println("Answer found. Checking which pH value was calibrated");
+      if (constants::DEBUG == 1)
+      {
+        Serial.println("Answer found. Checking which pH value was calibrated");
+      }
       while(1)
       {
-        Serial.println(".");
+        if (constants::DEBUG == 1)
+        {
+          Serial.println(".");
+        }
         delay(5000);
         if (Serial1.available() > 0)
         {
           answer = Serial1.readString();
           answer.trim();
-          Serial.println("answer was: ");
-          Serial.println(answer);
+          if (constants::DEBUG == 1)
+          {
+            Serial.println("answer was: ");
+            Serial.println(answer);
+          }
           if (answer == "7")
           {
             pH *= 1000;                                                                   //multiply by 100 to remove the decimal point 
@@ -286,6 +311,10 @@ void pHcalibration()
               Serial1.println("pH 7 calibrated");                 //send current pH values to RS485 bus
               delay(100);
               digitalWrite (ENABLE_PIN, LOW);                     //disable RS485 COM
+              if (constants::DEBUG == 1)
+              {
+                Serial.println("pH 7 calibrated");
+              }
               middle = 1;                                         //middlepoint has been set
             }
             break;
@@ -306,6 +335,10 @@ void pHcalibration()
                 Serial1.println("pH 4 calibrated");                 //send current pH values to RS485 bus
                 delay(100);
                 digitalWrite (ENABLE_PIN, LOW);                     //disable RS485 COM
+                if (constants::DEBUG == 1)
+                {
+                  Serial.println("pH 4 calibrated");
+                }
               }
             }
             else
@@ -314,6 +347,10 @@ void pHcalibration()
               Serial1.println("pH 4 was not calibrated - middle point missing!");
               delay(100);
               digitalWrite (ENABLE_PIN, LOW);                     //disable RS485 COM
+              if (constants::DEBUG == 1)
+              {
+                Serial.println("pH 4 was not calibrated - middle point missing!");
+              }
             }
             break;   
           }
@@ -333,6 +370,10 @@ void pHcalibration()
                 Serial1.println("pH 10 calibrated");                 //send current pH values to RS485 bus
                 delay(100);
                 digitalWrite (ENABLE_PIN, LOW);                     //disable RS485 COM
+                if (constants::DEBUG == 1)
+                {
+                  Serial.println("pH 10 calibrated");
+                }
               }
             }
             else
@@ -341,12 +382,19 @@ void pHcalibration()
               Serial1.println("pH 10 was not calibrated - middle point missing!");
               delay(100);
               digitalWrite (ENABLE_PIN, LOW);                     //disable RS485 COM
+              if (constants::DEBUG == 1)
+              {
+                Serial.println("pH 10 was not calibrated - middle point missing!");
+              }
             }
             break;
           }
           else if (answer == "finished")
           {
-            Serial.println("calibration finished");
+            if (constants::DEBUG == 1)
+            {
+              Serial.println("calibration finished");
+            }
             digitalWrite (ENABLE_PIN, HIGH);                    //enable RS485 COM
             Serial1.println("exit calibration");
             delay(100);
@@ -361,4 +409,166 @@ void pHcalibration()
       }
     }
   }
+}
+//**************************************
+//--------------------------------------end pH Calibration-----------------------------------
+//**************************************
+//--------------------------------------begin EC Calibration-----------------------------------
+//**************************************
+void Ccalibration() {
+  const byte calibration_register = 0x0A;                           //register to read / write
+  const byte calibration_request_register = 0x0E;                   //register to read / write
+  const byte calibration_confirmation_register = 0x0F;              //register to read
+  const byte cal_clear = 0x01;                                      //clear calibration
+  const byte cal_dry = 0x02;                                        //dry calibration
+  const byte cal_single = 0x03;                                     //single point calibration
+  const byte cal_low = 0x04;                                        //calibrate to a low-point EC value
+  const byte cal_high = 0x05;                                       //calibrate to a high-point EC value
+  float C = 0;                                                      //used to hold the new calibration value
+  String answer;                                                    //for the RS485 bus messages
+  char strTemp[10];                                                 //for the temperature values to compensate
+  byte reading_readyC = 0;
+
+while (1)
+  {
+    reading_readyC = request_reading(C_bus_address);  //see if a new pH value is ready
+    dtostrf(SensorTempRead(), 4, 2, strTemp);           //get new temperature value for compensation
+    temp_comp(strTemp);                                 //send temperature value as compensation
+    if (reading_readyC == 1)                           //if a new reading is available:
+    {
+      C = SensorCRead();                              //get the new pH value
+      check_reading(C_bus_address, reading_readyC);
+    }
+    digitalWrite (ENABLE_PIN, HIGH);                    //enable RS485 COM
+    Serial1.println(C, 4);                             //send current pH values to RS485 bus
+    if (constants::DEBUG == 1)
+      {
+        Serial.println(C, 4);
+      }
+    delay(500);
+    digitalWrite (ENABLE_PIN, LOW);                     //disable RS485 COM
+    if (Serial1.available() > 0)
+    {
+      Serial1.readString();
+      if (constants::DEBUG == 1)
+      {
+        Serial.println("Answer found. Checking how EC value was calibrated");
+      }
+      while(1)
+      {
+        if (constants::DEBUG == 1)
+        {
+          Serial.println(".");
+        }
+        delay(5000);
+        if (Serial1.available() > 0)
+        {
+          answer = Serial1.readString();
+          answer.trim();
+          if (constants::DEBUG == 1)
+          {
+            Serial.println("answer was: ");
+            Serial.println(answer);
+          }
+          if (answer == "low")
+          {
+            C *= 100;                                                                    //multiply by 100 to remove the decimal point 
+            move_data.answ = C;                                                          //move the float to an unsigned long 
+            i2c_write_long(calibration_register, move_data.answ, C_bus_address);
+            i2c_write_byte(calibration_request_register, cal_low, C_bus_address);        //write the calibration command to the calibration control register  
+            delay(100);
+            i2c_read(calibration_confirmation_register, one_byte_read, C_bus_address);   //read from the calibration control register to confirm it is set correctly
+            if (bitRead(move_data.i2c_data[0], 2)== 1)
+            {
+              digitalWrite (ENABLE_PIN, HIGH);                    //enable RS485 COM
+              Serial1.println("low-point calibration done");      //send current pH values to RS485 bus
+              delay(100);
+              digitalWrite (ENABLE_PIN, LOW);                     //disable RS485 COM
+              if (constants::DEBUG == 1)
+              {
+                Serial.println("low-point calibration done");
+              }
+            }
+            break;
+          }
+          else if (answer == "high")
+          {
+            C *= 100;                                                                     //multiply by 100 to remove the decimal point 
+            move_data.answ = C;                                                           //move the float to an unsigned long 
+            i2c_write_long(calibration_register, move_data.answ, C_bus_address);
+            i2c_write_byte(calibration_request_register, cal_high, C_bus_address);        //write the calibration command to the calibration control register  
+            delay(100);
+            i2c_read(calibration_confirmation_register, one_byte_read, C_bus_address);    //read from the calibration control register to confirm it is set correctly
+            if (bitRead(move_data.i2c_data[0], 3)== 1)
+            {
+              digitalWrite (ENABLE_PIN, HIGH);                    //enable RS485 COM
+              Serial1.println("high-point calibration done");     //send current pH values to RS485 bus
+              delay(100);
+              digitalWrite (ENABLE_PIN, LOW);                     //disable RS485 COM
+              if (constants::DEBUG == 1)
+              {
+                Serial.println("high-point calibration done");
+              }
+            }
+            break;
+          }
+          else if (answer == "dry")
+          {
+            i2c_write_byte(calibration_request_register, cal_dry, C_bus_address);        //write the calibration command to the calibration control register  
+            delay(15);
+            i2c_read(calibration_confirmation_register, one_byte_read, C_bus_address);   //read from the calibration control register to confirm it is set correctly
+            if (bitRead(move_data.i2c_data[0], 0)== 1)
+            {
+              digitalWrite (ENABLE_PIN, HIGH);                    //enable RS485 COM
+              Serial1.println("dry calibration done");            //send current pH values to RS485 bus
+              delay(100);
+              digitalWrite (ENABLE_PIN, LOW);                     //disable RS485 COM
+              if (constants::DEBUG == 1)
+              {
+                Serial.println("dry calibration done");
+              }
+            }
+            break;
+          }
+          else if (answer == "point")
+          {
+            C *= 100;                                                                    //multiply by 100 to remove the decimal point 
+            move_data.answ = C;                                                          //move the float to an unsigned long 
+            i2c_write_long(calibration_register, move_data.answ, C_bus_address);
+            i2c_write_byte(calibration_request_register, cal_single, C_bus_address);     //write the calibration command to the calibration control register  
+            delay(100);
+            i2c_read(calibration_confirmation_register, one_byte_read, C_bus_address);   //read from the calibration control register to confirm it is set correctly
+            if (bitRead(move_data.i2c_data[0], 1)== 1)
+            {
+              digitalWrite (ENABLE_PIN, HIGH);                    //enable RS485 COM
+              Serial1.println("single point calibration done");   //send current pH values to RS485 bus
+              delay(100);
+              digitalWrite (ENABLE_PIN, LOW);                     //disable RS485 COM
+              if (constants::DEBUG == 1)
+              {
+                Serial.println("single point calibration done");
+              }
+            }
+            break;
+          }
+          else if (answer == "finished")
+          {
+            if (constants::DEBUG == 1)
+            {
+              Serial.println("calibration finished");
+            }
+            digitalWrite (ENABLE_PIN, HIGH);                    //enable RS485 COM
+            Serial1.println("calibration finished");
+            delay(100);
+            digitalWrite (ENABLE_PIN, LOW);                     //disable RS485 COM
+            return(0);
+          }
+          else
+          {
+            continue;
+          }
+        }
+      }
+    }
+  } 
 }
