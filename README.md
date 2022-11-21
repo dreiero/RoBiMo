@@ -9,6 +9,6 @@ toDo:
 - [x] Query modus für das Anfragen mehrerer Sensorknoten
 - [x] Kalibriermodus für elektrische Leitfähigkeit und pH Wert
 - [x] Wechsel zwischen Query modus und schnellem Modus während der Laufzeit des Programms 
-
+- [ ] Belastungstest und Fehlersuche
 
 veraltet: ~~Die .bas Datei ist ein Excel VBA Makro, um leicht kommaseparierte .csv-Dateien umzuwandeln.~~
