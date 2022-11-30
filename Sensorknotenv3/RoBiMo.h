@@ -114,21 +114,21 @@ void i2c_write_long(byte reg, unsigned long data, byte bus_address)
 }
 //************************************
 //************************************
-byte request_reading(byte bus_address)
+byte request_reading(byte bus_address)                            //ask if a new reading is availeable
 {
-  byte nra = 0x07;
-  byte new_reading_availeable;
-  Wire.beginTransmission(bus_address);
-  Wire.write(nra);
-  Wire.endTransmission();
-  Wire.requestFrom(bus_address, (byte)1);
-  new_reading_availeable = Wire.read();
-  Wire.endTransmission(); 
-  return new_reading_availeable; 
+  byte nra = 0x07;                                                //the register that gives this info on both EC and pH chip
+  byte new_reading_availeable;                                    //to store our answer
+  Wire.beginTransmission(bus_address);                            //begin I2C communication to our given address (either EC or pH)
+  Wire.write(nra);                                                //write the wanted register
+  Wire.endTransmission();                                         //end transmission ==> chip read our request
+  Wire.requestFrom(bus_address, (byte)1);                         //read the I2C bus 
+  new_reading_availeable = Wire.read();                           //whatever the answer is, we store it
+  Wire.endTransmission();                                         //ending I2C COM for now
+  return new_reading_availeable;                                  //return our collected answer
 }
 //************************************
 //************************************
-void check_reading(byte bus_address, byte new_reading_availeable)
+void check_reading(byte bus_address, byte new_reading_availeable) //basically the same as request_reading(), but without getting an answer | used to set the chip as "we have read your data"
 {
   byte nra = 0x07;
   Wire.beginTransmission(bus_address);
@@ -149,12 +149,12 @@ void hybernate(byte bus_address)
 }
 //************************************
 //************************************
-void temp_comp(char compensation[10])
+void temp_comp(char compensation[10])                                                   //to compensate with the current temperature
 {                      
   const byte pH_temperature_compensation_register = 0x0E;                               //register to write pH
   const byte C_temperature_compensation_register = 0x10;                                //register to write EC
   int temp;
-  temp = atoi(compensation);
+  temp = atoi(compensation);                                                            //convert the quasi string to integer values
   temp *= 100;                                                                          //multiply by 100 to remove the decimal point 
   move_data.answ = temp;                                                                //move the float to an unsigned long 
   i2c_write_long(pH_temperature_compensation_register, move_data.answ, pH_bus_address); //write the 4 bytes of the long to the compensation register
@@ -172,18 +172,18 @@ float SensorTempRead()                          //function to read and calculate
   float average;
   float temp;
   average = 0;
-  for (i=0; i<TEMPNUMSAMPLES; i++)
-    {average += analogRead(THERMISTORPIN);
+  for (i=0; i<TEMPNUMSAMPLES; i++)              //collect some data a number of TEMPNUMSAMPLES * times
+    {average += analogRead(THERMISTORPIN);      //add up all the data
     delay(10);}
-  average = average / TEMPNUMSAMPLES;
-  average = 1023 / average -1;
+  average = average / TEMPNUMSAMPLES;           //and calculate the average
+  average = 1023 / average -1;                  
   average = SERIESRESISTOR / average;
-  temp = average / THERMISTORNOMINAL;          //(R/Ro)
-  temp = log(temp);                            //ln(R/Ro)
-  temp = temp / BCOEFFICIENT;                  //1/B * ln(R/Ro)
-  temp += 1.0 / (TEMPERATURENOMINAL + 273.15); //+ (1/To)
-  temp = 1.0 / temp;                           //Invert
-  temp -= 273.15;                              //convert to degrees Celsius
+  temp = average / THERMISTORNOMINAL;           //(R/Ro)
+  temp = log(temp);                             //ln(R/Ro)
+  temp = temp / BCOEFFICIENT;                   //1/B * ln(R/Ro)
+  temp += 1.0 / (TEMPERATURENOMINAL + 273.15);  //+ (1/To)
+  temp = 1.0 / temp;                            //Invert
+  temp -= 273.15;                               //convert to degrees Celsius
   temp += constants::TEMPCALIB;
   return(temp); 
   }
@@ -207,7 +207,7 @@ float SensorPressRead()
 //--------------------------------------begin conductivity read-----
 void set_probe() {                                                                        
   const byte set_probe_type_register = 0x08;                                            //register to read
-  float k_value = constants::KVALUE;                                                                 //used to hold the new k value
+  float k_value = constants::KVALUE;                                                    //used to hold the new k value
   //atof(data_byte_1);                                                                  //convert the k value entered from a string to a float
   k_value *= 100;                                                                       //multiply by 100 to remove the decimal point
   move_data.answ = k_value;                                                             //move the float to an unsigned long
@@ -230,9 +230,9 @@ float SensorCRead()
 float SensorpHRead()
 {
   const byte pH_register = 0x16;                          //register to read
-  float pH;                                           //used to hold the new pH value
+  float pH;                                               //used to hold the new pH value
   i2c_read(pH_register, four_byte_read, pH_bus_address);  //I2C_read(OEM register, number of bytes to read)                  
-  pH = move_data.answ;     //antwort;                               //move the 4 bytes read into a float
+  pH = move_data.answ;                                    //move the 4 bytes read into a float
   pH /= 1000;
   return pH; 
 }
@@ -274,30 +274,30 @@ void pHcalibration()
     delay(500);
     digitalWrite (ENABLE_PIN, LOW);                     //disable RS485 COM
     
-    if (Serial1.available() > 0)
+    if (Serial1.available() > 0)                        //if we are interrupted by some answer:
     {
-      Serial1.readString();
+      Serial1.readString();                             //read the answer and reset the channel
       if (constants::DEBUG == 1)
       {
         Serial.println("Answer found. Checking which pH value was calibrated");
       }
-      while(1)
+      while(1)                                          //now we wait for the "real" answer, the actual command
       {
         if (constants::DEBUG == 1)
         {
           Serial.println(".");
         }
-        delay(5000);
-        if (Serial1.available() > 0)
+        delay(5000);                                    //wait 5 second and then try again
+        if (Serial1.available() > 0)                    //if we have a new answer
         {
-          answer = Serial1.readString();
-          answer.trim();
+          answer = Serial1.readString();                //read it
+          answer.trim();                                //get rid of any unnecessary stuff like line breaks
           if (constants::DEBUG == 1)
           {
             Serial.println("answer was: ");
             Serial.println(answer);
           }
-          if (answer == "7")
+          if (answer == "7")                            //toggle between different possible answers: this is the starting point
           {
             pH *= 1000;                                                                   //multiply by 100 to remove the decimal point 
             move_data.answ = pH;                                                          //move the float to an unsigned long 
@@ -321,7 +321,7 @@ void pHcalibration()
           }
           else if (answer == "4")
           {
-            if (middle == 1)
+            if (middle == 1)                                                                //if no middlepoint is set, this value is useless
             {
               pH *= 1000;                                                                   //multiply by 100 to remove the decimal point 
               move_data.answ = pH;                                                          //move the float to an unsigned long 
@@ -356,7 +356,7 @@ void pHcalibration()
           }
           else if (answer == "10")
           {
-            if (middle == 1)
+            if (middle == 1)                                                                //if no middlepoint is set, this value is useless
             {
               pH *= 1000;                                                                   //multiply by 100 to remove the decimal point 
               move_data.answ = pH;                                                          //move the float to an unsigned long 
@@ -389,7 +389,7 @@ void pHcalibration()
             }
             break;
           }
-          else if (answer == "finished")
+          else if (answer == "finished")                        //if the user wants to get out of calibration mode
           {
             if (constants::DEBUG == 1)
             {
@@ -415,7 +415,7 @@ void pHcalibration()
 //**************************************
 //--------------------------------------begin EC Calibration-----------------------------------
 //**************************************
-void Ccalibration() {
+void Ccalibration() {                                               //this function is fairly similar to the calibration of the pH chip. Only the cases to calibrate to are different
   const byte calibration_register = 0x0A;                           //register to read / write
   const byte calibration_request_register = 0x0E;                   //register to read / write
   const byte calibration_confirmation_register = 0x0F;              //register to read

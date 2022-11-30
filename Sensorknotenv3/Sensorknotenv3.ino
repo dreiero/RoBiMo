@@ -119,45 +119,46 @@ void loop() //this function runs continually, until power is cut or reset button
   int go = 0;               //stores if an answer should be send via RS485 or not ==> goal: reusing the same answer-sending-code for query and fast mode
   
   digitalWrite(13,LOW);
-  if (QUERYMODE == 1)
+  
+  if (QUERYMODE == 1)       //if the program is in the query mode: wait and check for input
   {
-    if (Serial1.available() > 0)
+    if (Serial1.available() > 0)  //if input is availeable: 
     {
-      answer = Serial1.readString();
-      answer.trim();
-      if (constants::DEBUG == 1)
+      answer = Serial1.readString();  //read the input
+      answer.trim();                  //get rid of additional "new line" characters etc.
+      if (constants::DEBUG == 1)      //also print the received answer if in debug mode
       {
         Serial.println(answer);
       }
-      if (answer == constants::KnotenID)
+      if (answer == constants::KnotenID)  //if the answer is the name of the sensor node:
       {
-        go = 1;
+        go = 1;                           //set go to one, meaning it will send the measured data via RS485
       }
-      else if (answer.indexOf("fastMeasure") != -1)
+      else if (answer.indexOf("fastMeasure") != -1) //if the answer contains this ("fastMeasure") string: 
       {
-        if (answer.indexOf(constants::KnotenID) == 0)
+        if (answer.indexOf(constants::KnotenID) == 0) //and at the start of the answer is the nodes' name:
         {
-          QUERYMODE = 0;
-          go = 1;
+          QUERYMODE = 0;                              //exit query mode into fast mode
+          go = 1;                                     //start off by sending the data
         }
-        else
+        else                                          //if it doesn't contain the nodes' name:
         {
-          QUERYMODE = 1;
-          go = 0;
+          QUERYMODE = 1;                              //stay in query mode
+          go = 0;                                     //and don't send any data (for now)
         }
       }
-      else if (answer.indexOf("pHCalib") != -1)
+      else if (answer.indexOf("pHCalib") != -1)       //if the answer contains this ("pHCalib") string:
       {
-        if (answer.indexOf(constants::KnotenID) == 0)
+        if (answer.indexOf(constants::KnotenID) == 0) //and at the start of the answer is the nodes' name:
         {
           if (constants::DEBUG == 1)
           {
             Serial.println("pH calibration started");
           }
-          pHcalibration();
+          pHcalibration();                            //start the pH calibration (function found in RoBiMo.h)
         }
       }
-      else if (answer.indexOf("CCalib") != -1)
+      else if (answer.indexOf("CCalib") != -1)        //if the answer contains this ("CCalib") string:
       {
         if (answer.indexOf(constants::KnotenID) == 0)
         {
@@ -165,18 +166,18 @@ void loop() //this function runs continually, until power is cut or reset button
           {
             Serial.println("EC calibration started");
           }
-          Ccalibration();
+          Ccalibration();                             //start the EC calibration (function found in RoBiMo.h)
         }
       }
-      else
+      else                                            //if no viable answer was found, send no data
       {
         go = 0;
       }
     }
   }
-  else                            //not in query mode ==> fast measurement
+  else                                                //if we are not in query mode ==> fast measurement
   {
-    go = 0;
+    go = 0;                                           //don't send any data unless we say so (might be unnecessary here)
     if (Serial1.available() > 0)  //if the node can read any message on the RS485 bus ==> switch to query mode
     {
       QUERYMODE = 1;
@@ -189,28 +190,28 @@ void loop() //this function runs continually, until power is cut or reset button
   
  if (go == 1)                     //regardless of measuring mode, if go == 1 then send some data!
   {
-    digitalWrite(4,LOW);
+    digitalWrite(4,LOW);          //start by setting the green LED low, so we know your doing anything
     /* Get a new orientation sensor event */ 
-    sensors_event_t event; 
-    bno.getEvent(&event);
+    sensors_event_t event;        //update every Adafruit sensor (right now we are only using the bno)
+    bno.getEvent(&event);         //get the updated data from the bno
     /*read analog sensors and data from orientation sensor*/
-    dtostrf(SensorTempRead(), 4, 2, strTemp);
-    dtostrf(SensorPressRead(), 4, 3, strPress);
-    dtostrf(event.orientation.x, 4, 1, OrientationX);
-    dtostrf(event.orientation.y, 4, 1, OrientationY);
-    dtostrf(event.orientation.z, 4, 1, OrientationZ);
+    dtostrf(SensorTempRead(), 4, 2, strTemp);   //call SensorTempRead (see RoBiMo.h) and convert the answer to a some characters
+    dtostrf(SensorPressRead(), 4, 3, strPress); //same with SensorPressRead
+    dtostrf(event.orientation.x, 4, 1, OrientationX); //here we don't call a new function, instead we just get the orientation data from our build in structure
+    dtostrf(event.orientation.y, 4, 1, OrientationY); //same here
+    dtostrf(event.orientation.z, 4, 1, OrientationZ); //and here
     /*see if new readings are availeable*/
-    reading_readyC = request_reading(C_bus_address);
-    reading_readypH = request_reading(pH_bus_address);
+    reading_readyC = request_reading(C_bus_address);    //asking if there are any updates from the EC chip
+    reading_readypH = request_reading(pH_bus_address);  //same here for the pH chip
     /*send current temp to pH and EC Chip for temp-compensation*/
-    temp_comp(strTemp);
+    temp_comp(strTemp);                                 //send the current temperature to both EC and pH chip for compensation
     /*read data from pH and EC chips*/
-    if (reading_readyC == 1)
+    if (reading_readyC == 1)                            //if we got new data waiting on the chips:
     {
-      C = SensorCRead();
-      check_reading(C_bus_address, reading_readyC);
+      C = SensorCRead();                                //come and get it
+      check_reading(C_bus_address, reading_readyC);     //and let it know we have read the new data
     }
-    if (reading_readypH == 1)
+    if (reading_readypH == 1)                           //same for the pH chip
     {
       pH = SensorpHRead();
       check_reading(pH_bus_address, reading_readypH);
@@ -234,9 +235,9 @@ void loop() //this function runs continually, until power is cut or reset button
       Serial.print(strPress);
       Serial.print("\r\n");
     }
-    delay(100);
-    /*Senden der Daten mit ID*/
-    digitalWrite (ENABLE_PIN, HIGH);  //enable Communication over RS485 (sending)
+    delay(100);                   
+    /*Senden der Daten mit ID*/       //sending all the collected data via RS485
+    digitalWrite (ENABLE_PIN, HIGH);  //enable Communication over RS485 (sending), necessary to activate our MAX485 chip in writing mode
     Serial1.print(constants::KnotenID);
     Serial1.print(",T,");                             
     Serial1.print(strTemp);
@@ -253,12 +254,12 @@ void loop() //this function runs continually, until power is cut or reset button
     Serial1.print(",p,");
     Serial1.print(strPress);
     Serial1.print("\r\n");
-    delay(100);
-    digitalWrite (ENABLE_PIN, LOW);   //disable RS485 COM
+    delay(100);                       //wait a moment
+    digitalWrite (ENABLE_PIN, LOW);   //disable RS485 COM and by that the MAX485 writing
     digitalWrite(4,HIGH);
   }           //end of "if go == 1" ==> end of data to send
-  delay(100); //animate the red LED (fast blink), once per loop-function run
-  digitalWrite(13,HIGH);
+  delay(100); 
+  digitalWrite(13,HIGH);//animate the red LED (fast blink), once per loop-function run
   delay(100);  
 }
 //--------------------------------------end loop--------------------
