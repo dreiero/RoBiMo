@@ -6,14 +6,14 @@
  */
 
 
-namespace constants
+namespace constants                   //here the same namespace, but without values
 {
-  extern const int DEBUG;                //1 = DEBUG mode on | 0 = DEBUG mode off | sends additional info through the USB Serial ("Serial"). 
-  extern const float PROGRAMVERS;      //description of program version
+  extern const int DEBUG;             //1 = DEBUG mode on | 0 = DEBUG mode off | sends additional info through the USB Serial ("Serial"). 
+  extern const float PROGRAMVERS;     //description of program version
   extern const char KnotenID[];       //ID as a beginning for the 
-  extern const int TIMEOUT;            //Timeout for the RS485 Serial ("Serial1"). default from the library is 1000, changed to 100 for faster responses
-  extern const int TEMPCALIB;            //Temperature calibration factor, gets added as the last step in temperature measurement
-  extern const int PRESSCALIB;           //Pressure calibration factor, gets added as the last step in Pressure measurement
+  extern const int TIMEOUT;           //Timeout for the RS485 Serial ("Serial1"). default from the library is 1000, changed to 100 for faster responses
+  extern const int TEMPCALIB;         //Temperature calibration factor, gets added as the last step in temperature measurement
+  extern const int PRESSCALIB;        //Pressure calibration factor, gets added as the last step in Pressure measurement
   extern const float KVALUE;          //K value of the electrical conductivity electrodes (for IST-AG electrodes use 0.44)
 }
 
