@@ -472,6 +472,7 @@ while (1)
           }
           if (answer == "low")
           {
+            C = 12880;                                                                   //set low-point calibration solution to 12,880 µS. CHANGE IF USING A DIFFERENT SOLUTION!
             C *= 100;                                                                    //multiply by 100 to remove the decimal point 
             move_data.answ = C;                                                          //move the float to an unsigned long 
             i2c_write_long(calibration_register, move_data.answ, C_bus_address);
@@ -491,8 +492,16 @@ while (1)
             }
             break;
           }
+          else if (answer == "clear")
+          {
+            i2c_write_byte(calibration_request_register, cal_clear, C_bus_address);       //write the calibration clear command to the calibration control register
+            delay(100);                                                                   //wait for the calibration event to finish
+            i2c_read(calibration_confirmation_register, one_byte_read, C_bus_address);    //read from the calibration control register to confirm it is set correctly
+            break;
+          }
           else if (answer == "high")
           {
+            C = 80000;                                                                    //set high-point calibration solution to 80,000 µS. CHANGE IF USING A DIFFERENT SOLUTION!
             C *= 100;                                                                     //multiply by 100 to remove the decimal point 
             move_data.answ = C;                                                           //move the float to an unsigned long 
             i2c_write_long(calibration_register, move_data.answ, C_bus_address);
@@ -530,7 +539,7 @@ while (1)
             }
             break;
           }
-          else if (answer == "point")
+          /*else if (answer == "point")
           {
             C *= 100;                                                                    //multiply by 100 to remove the decimal point 
             move_data.answ = C;                                                          //move the float to an unsigned long 
@@ -550,7 +559,7 @@ while (1)
               }
             }
             break;
-          }
+          }*/
           else if (answer == "finished")
           {
             if (constants::DEBUG == 1)
